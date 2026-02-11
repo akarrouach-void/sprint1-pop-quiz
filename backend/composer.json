@@ -1,0 +1,18 @@
+{
+    "name": "sprint1-pop-quiz/backend",
+    "autoload": {
+        "psr-4": {
+            "Sprint1PopQuiz\\Backend\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Hamza Bahlouane",
+            "email": "h.bahlaouane@void.fr"
+        }
+    ],
+    "require": {
+        "slim/slim": "4.*",
+        "slim/psr7": "^1.7"
+    }
+}
