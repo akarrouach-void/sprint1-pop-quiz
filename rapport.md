@@ -108,3 +108,60 @@ ab -n 200 -c 10 http://localhost:8888/crash
 ```
 
 **Résultat:** ✅ Le serveur gère maintenant toutes les requêtes sans crash. Les 200 requêtes avec 10 connexions simultanées sont traitées avec succès.
+
+---
+
+## Chapitre 2: Frontend
+
+### 🔍 Appel Fetch / XHR sur la Route /fetch
+
+#### Problème Identifié
+
+Requêtes XHR bloquées par CORS:
+
+```
+Access to fetch at 'http://localhost:8888/fetch' from origin 'http://localhost:5173'
+has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present
+```
+
+Erreur 401 Unauthorized - authentification manquante.
+
+#### Solution Implémentée
+
+**1. Middleware CORS dans backend/index.php:**
+
+```php
+$app->add(function ($request, $handler) {
+    // Gérer les requêtes OPTIONS pour le pré-vol CORS
+    if ($request->getMethod() === 'OPTIONS') {
+        $response = new \Slim\Psr7\Response();
+        return $response
+            ->withHeader('Access-Control-Allow-Origin', 'http://localhost:5173')
+            ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+            ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+            ->withStatus(200);
+    }
+
+    $response = $handler->handle($request);
+    return $response
+        ->withHeader('Access-Control-Allow-Origin', 'http://localhost:5173')
+        ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+});
+```
+
+**Point clé:** La gestion du preflight OPTIONS est essentielle. Le navigateur envoie automatiquement une requête OPTIONS avant la vraie requête GET quand un header Authorization est présent.
+
+**2. Configuration frontend (.env + fetch.lazy.jsx):**
+
+```javascript
+// .env
+VITE_API_TOKEN=dXNlcm5hbWU6cGFzc3dvcmQ=
+
+// fetch.lazy.jsx
+headers: {
+    Authorization: `Basic ${import.meta.env.VITE_API_TOKEN}`,
+}
+```
+
+**Résultat:** ✅ Requêtes XHR réussies avec authentification Basic Auth.
