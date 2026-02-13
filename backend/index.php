@@ -38,7 +38,7 @@ $app->get('/', function (Request $request, Response $response, $args) {
 
 $app->get('/broken', function (Request $request, Response $response, $args) {
     /** @disregard P1013 because we're just testing */
-    $response->getBody()->wr​ite("Hello world!");
+    $response->getBody()->write("Hello world!");
     return $response;
 });
 
