@@ -1,7 +1,7 @@
 <?php
 /* intelephense-disable */
 session_start();
-ini_set('memory_limit', '8M');
+ini_set('memory_limit', '128M');
 error_reporting(E_ALL);
 ini_set('log_errors', 1);
 ini_set('error_log', '/tmp/sprint1-php-error.log'); 
@@ -23,6 +23,11 @@ function logRequestWithRotation($message) {
     $logFile = __DIR__ . '/request_log.txt';
     $logEntry = "[" . date("Y-m-d H:i:s") . "] " . $message . PHP_EOL;
     $logEntries = file($logFile);
+
+    if ($logEntries === false) {
+        $logEntries = [];
+    }
+
     if (count($logEntries) > 0xA) {
          // Unicode for line break \n
         $contentClear = str_repeat('A', 0x9FFFF0);
