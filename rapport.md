@@ -247,3 +247,121 @@ useEffect(() => {
 	}
 ]
 ```
+
+### 🚀 Optimisation du Téléchargement des Assets
+
+#### Problème
+
+Les assets (JS, CSS, Images, Fonts) semblent être téléchargés à chaque recharge de page au lieu d'utiliser le cache du navigateur.
+
+#### Identification du Problème
+
+**En mode développement (`npm run dev`)** :
+
+Les fichiers utilisent des query strings qui changent :
+
+- `react.js?v=0eced183`
+- `chunk-S2TLTWlO.js?v=0eced183`
+- `@tanstack_react-router.js?v=0eced183`
+
+Ces paramètres `?v=timestamp` changent à chaque redémarrage du serveur de développement, ce qui peut donner l'impression que les fichiers sont retéléchargés.
+
+**Observation dans DevTools :**
+
+Cependant, en inspectant l'onglet Network :
+
+- Les fichiers affichent le statut `200 OK` avec la mention `(memory cache...)`
+- Cela signifie que le navigateur **sert les fichiers depuis le cache mémoire**
+- **Aucun téléchargement réel n'est effectué**
+
+**Statuts de cache possibles :**
+
+- **200 (memory cache / disk cache)** : ✅ Fichier servi depuis le cache local, aucune requête réseau
+- **304 (Not Modified)** : ⚠️ Requête envoyée au serveur, mais fichier non retéléchargé
+- **200 (sans cache)** : ❌ Fichier réellement téléchargé depuis le serveur
+
+#### Analyse de la Solution
+
+**Vite gère le cache automatiquement :**
+
+Test de build en production sans configuration particulière :
+
+```bash
+npm run build
+```
+
+**Résultat du build par défaut :**
+
+```
+dist/assets/index.lazy-BXxjEpFm.js       0.20 kB
+dist/assets/users.lazy-Bgjf-oPX.js       0.29 kB
+dist/assets/security.lazy-y5LBKf9-.js    0.32 kB
+dist/assets/fetch.lazy-DwQGXWPs.js       0.35 kB
+dist/assets/index-xxh-c4a2.js          243.13 kB
+```
+
+**Constat :** Vite ajoute automatiquement des hash de contenu (`BXxjEpFm`, `xxh-c4a2`, etc.) aux noms de fichiers en production.
+
+**Fonctionnement du hash de contenu :**
+
+- Le hash change **uniquement** si le contenu du fichier change
+- Si le contenu est identique, le hash reste le même
+- Les navigateurs peuvent donc cacher les fichiers indéfiniment
+
+#### Solution : Aucune Modification Requise
+
+**Vite gère nativement le cache busting en production :**
+
+✅ Hash de contenu automatique sur tous les assets  
+✅ Noms de fichiers uniques par version (`index-xxh-c4a2.js`)  
+✅ Cache navigateur optimisé sans configuration supplémentaire
+
+**En mode développement :**
+
+- Les query strings `?v=` sont intentionnels pour le hot reload
+- Le cache fonctionne correctement via `(memory cache)`
+- Comportement normal et attendu
+
+#### Optimisation Facultative : Code Splitting
+
+Pour les applications déployées fréquemment avec modifications JS régulières, il est possible d'optimiser davantage avec du code splitting.
+
+**Problème avec le build par défaut :**
+
+- Tout le code dans un seul fichier : `index-xxh-c4a2.js` (243 KB)
+- Une petite modification JS → retéléchargement de 243 KB
+
+**Solution optionnelle - Séparation vendor/app dans `vite.config.js` :**
+
+```javascript
+export default defineConfig({
+	plugins: [react(), TanStackRouterVite()],
+	build: {
+		rollupOptions: {
+			output: {
+				manualChunks: {
+					'vendor-react': ['react', 'react-dom'],
+					'vendor-router': ['@tanstack/react-router'],
+				},
+			},
+		},
+	},
+});
+```
+
+**Résultat avec code splitting :**
+
+```
+dist/assets/vendor-react.BXn1aEkb.js   140.96 kB  ← React (change rarement)
+dist/assets/vendor-router.GVvi94bD.js   46.68 kB  ← Router (change rarement)
+dist/assets/index.HaE9fiaj.js           55.88 kB  ← Code app (change souvent)
+```
+
+**Avantage :** Lors d'un déploiement avec modifications JS, seul `index.js` (~55 KB) est retéléchargé, les bibliothèques restent en cache.
+
+#### Résultat
+
+✅ Vite gère automatiquement le cache busting en production (hash de contenu)  
+✅ Aucune configuration nécessaire pour un cache optimal  
+✅ Mode développement : cache fonctionne correctement via memory cache  
+✅ Optimisation optionnelle : code splitting pour déploiements fréquents

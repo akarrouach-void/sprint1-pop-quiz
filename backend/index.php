@@ -17,16 +17,22 @@ $app = AppFactory::create();
 
 // Ajouter le middleware CORS
 $app->add(function ($request, $handler) {
+    $allowedOrigins = ['http://localhost:5173', 'http://localhost:4173'];
+    $origin = $request->getHeaderLine('Origin');
+
     if ($request->getMethod() === 'OPTIONS') {
         $response = new \Slim\Psr7\Response();
     } else {
         $response = $handler->handle($request);
     }
 
+    $allowOrigin = in_array($origin, $allowedOrigins) ? $origin : $allowedOrigins[0];
+
     return $response
-        ->withHeader('Access-Control-Allow-Origin', 'http://localhost:5173')
+        ->withHeader('Access-Control-Allow-Origin', $allowOrigin)
         ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        ->withHeader('Access-Control-Allow-Credentials', 'true');
 });
 
 if (!isset($_SESSION['_qc'])) {
