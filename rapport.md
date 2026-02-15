@@ -19,7 +19,6 @@ La page `http://localhost:8888/broken` retourne une erreur HTTP 500 sans message
 Corrigez la méthode en supprimant le caractère invisible.
 
 ```php
-// filepath: /Users/void/dev/sprint1-pop-quiz/backend/index.php
 $app->get('/broken', function (Request $request, Response $response, $args) {
     /** @disregard P1013 because we're just testing */
     $response->getBody()->write("Hello world!");
@@ -131,18 +130,13 @@ Erreur 401 Unauthorized - authentification manquante.
 **1. Middleware CORS dans backend/index.php:**
 
 ```php
-$app->add(function ($request, $handler) {
-    // Gérer les requêtes OPTIONS pour le pré-vol CORS
+$app->add(function ($request, $handler) {ß
     if ($request->getMethod() === 'OPTIONS') {
         $response = new \Slim\Psr7\Response();
-        return $response
-            ->withHeader('Access-Control-Allow-Origin', 'http://localhost:5173')
-            ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-            ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-            ->withStatus(200);
+    } else {
+        $response = $handler->handle($request);
     }
 
-    $response = $handler->handle($request);
     return $response
         ->withHeader('Access-Control-Allow-Origin', 'http://localhost:5173')
         ->withHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
@@ -165,3 +159,91 @@ headers: {
 ```
 
 **Résultat:** ✅ Requêtes XHR réussies avec authentification Basic Auth.
+
+### 🛑 Problème des Appels XHR sur la Page /users
+
+#### Problème Identifié
+
+La page `/users` échoue avec une erreur 405 (Method Not Allowed) et génère une erreur de parsing JSON:
+
+```
+POST http://localhost:8888/users 405 (Method Not Allowed)
+SyntaxError: Unexpected token 'M', "Method Not Allowed" is not valid JSON
+```
+
+#### Analyse de l'Erreur
+
+**Cause racine:** Incohérence entre la méthode HTTP utilisée et la méthode acceptée.
+
+**Backend (`backend/index.php`):**
+
+```php
+$app->any('/users', function (Request $request, Response $response, $args) {
+    if ($request->getMethod() === 'POST') {
+        $response->getBody()->write("Method Not Allowed");
+        return $response->withStatus(405);  // ❌ Rejette POST
+    }
+    // ... Retourne les utilisateurs pour GET
+});
+```
+
+**Frontend (`users.lazy.jsx`):**
+
+```javascript
+fetch(`${import.meta.env.VITE_API_URL}/users`, {
+	method: 'POST', // ❌ Utilise POST
+}).then((response) => response.json()); // ❌ Tente de parser "Method Not Allowed" comme JSON
+```
+
+**Problèmes identifiés:**
+
+1. Le frontend envoie une requête POST
+2. Le backend rejette POST avec un statut 405 et un message texte brut
+3. Le frontend tente de parser le message d'erreur texte comme JSON → SyntaxError
+
+#### Solution Proposée
+
+Corriger la méthode HTTP dans le frontend pour utiliser GET (méthode acceptée par le backend):
+
+```javascript
+useEffect(() => {
+	fetch(`${import.meta.env.VITE_API_URL}/users`) // GET par défaut
+		.then((response) => response.json())
+		.then((data) => console.log(data));
+}, []);
+```
+
+**Justification:**
+
+- Le endpoint `/users` est conçu pour retourner la liste des utilisateurs via GET
+- Aucune raison fonctionnelle d'utiliser POST pour récupérer des données (violation des conventions REST)
+- GET est la méthode appropriée pour les opérations de lecture
+
+#### Résultat
+
+✅ La requête réussit avec un statut 200
+✅ Les données JSON sont correctement parsées
+✅ La liste des utilisateurs s'affiche dans la console:
+
+```json
+[
+	{
+		"id": 1,
+		"nom": "Jean Dupont",
+		"email": "jean.dupont@example.com",
+		"role": "administrateur"
+	},
+	{
+		"id": 2,
+		"nom": "Marie Durand",
+		"email": "marie.durand@example.com",
+		"role": "utilisateur"
+	},
+	{
+		"id": 3,
+		"nom": "Pierre Martin",
+		"email": "pierre.martin@example.com",
+		"role": "utilisateur"
+	}
+]
+```
